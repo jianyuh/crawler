@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <unistd.h>
 
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void* fetch(void* arg)
 {
@@ -17,16 +18,30 @@ void* fetch(void* arg)
     // TODO: tolower
     if (spliter.get_proto() && strcmp(spliter.get_proto(), "http") != 0)
     {
+        pthread_mutex_lock(&mutex);
         spliter.print();
         printf("Sorry, I can only deal http.\n");
+        printf("<<----------------------\n");
+        pthread_mutex_unlock(&mutex);
         return NULL;
     }
     
     Http_handle http_handle(spliter.get_domin(), spliter.get_port(), spliter.get_path());
+    if (http_handle.request() == -1)
+    {
+        pthread_mutex_lock(&mutex);
+        spliter.print();
+        printf("connect error\n");
+        printf("<<----------------------\n");
+        pthread_mutex_unlock(&mutex);
+        return NULL;
+    }
+    
+    pthread_mutex_lock(&mutex);
     spliter.print();
-    printf("\n");
-    http_handle.request();
+    http_handle.print_abstract();
     printf("<<----------------------\n");
+    pthread_mutex_unlock(&mutex);
     return NULL;
 }
 
@@ -38,7 +53,7 @@ int main(int argc, char *argv[])
         pthread_t id;
         pthread_create(&id, NULL, fetch, (void*)argv[i]);
     }
-    sleep(2);
+    sleep(10);
     return 0;
 }
 

@@ -26,6 +26,7 @@ Http_handle::Http_handle(char* host, int port, char* path)
         this->path = path;
     else
         this->path = empty;
+    html = buffer;
     return;
 }
 
@@ -38,17 +39,11 @@ int Http_handle::sock_connect()
     struct hostent *hp;
     hp = gethostbyname(host);
     if (hp == NULL)
-    {
-        printf("Error while gethostbyname\n");
-        exit(-1);
-    }
+        return -1;
 
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1)
-    {
-        printf("Error while create socket\n");
-        exit(-1);
-    }
+        return -1;
     
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
@@ -56,26 +51,102 @@ int Http_handle::sock_connect()
     addr.sin_port = htons(port);
 
     if (connect(sockfd, (struct sockaddr*)&addr, sizeof(struct sockaddr)) == -1)
-    {
-        printf("Error while connect!\n");
-        exit(-1);
-    }
+        return -1;
     return sockfd;
 }
 
 int Http_handle::request()
 {
     fd = sock_connect();
+    if (fd == -1) return -1;
     sprintf(buffer, format, path, host, port);
     
     int len = 0;
     len = send(fd, (void*)buffer, strlen(buffer), 0);
     len = recv(fd, (void*)buffer, BUFFERSIZE, 0);
+    this->clen = len;
+    sep();
     close(fd);
+    return 0;
 }
 
 void Http_handle::print_abstract()
 {
-    // TODO
-    printf("%s\n", buffer);
+    printf("Code : %d\n", get_code());
+    printf("Content-Length: %d\n", get_clen());
+}
+
+void Http_handle::sep()
+{
+    int count = 0;
+    char *p = buffer;
+    while (true)
+    {
+        if (count > 500)
+            return;
+        p++;
+        count++;
+        if (*p == '\n')
+            if (*(p+1) == '\r' || *(p+1) == '\n')
+                break;
+    }
+    while (*p == '\r' || *p == '\n')
+        p++;
+    html = p;
+    clen -= p - buffer;
+    return;
+}
+
+char* Http_handle::read()
+{
+    return html;
+}
+
+int Http_handle::get_clen()
+{
+    int count = 0;
+    int len = 0;
+    char *p = buffer;
+    while (true)
+    {
+        count++;
+        if (count > 500)
+            return clen;
+        if (*p != 'C')
+        {
+            p++;
+            continue;
+        }
+        if (strncmp(p, "Content-Length", 14) != 0)
+        {
+            p++;
+            continue;
+        }
+        else
+            break;
+    }
+    p += 15;
+    while (*p == ' ') p++;
+    while (*p != '\r' && *p != '\n' && *p != ' ')
+    {
+        len *= 10;
+        len += *p - '0';
+        p++;
+    }
+    return len;
+}
+
+int Http_handle::get_code()
+{
+    int code = 0;
+    char *p = buffer;
+    while (*p != ' ') p++;
+    p++;
+    while (*p != ' ')
+    {
+        code *= 10;
+        code += *p - '0';
+        p++;
+    }
+    return code;
 }
