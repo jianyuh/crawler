@@ -14,11 +14,15 @@ private:
     States state;
     char* url;
     int handle(int index);
-    void print();
 public:
     Spliter(char* url);
     ~Spliter();
     void exec();
+    void print();
+    char* get_proto();
+    char* get_domin();
+    int get_port();
+    char* get_path();
 };
 
 #endif /* _SPLITER_H_ */

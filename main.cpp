@@ -12,6 +12,9 @@ int main(int argc, char *argv[])
 
     Spliter spliter(argv[1]);
     spliter.exec();
+    spliter.print();
+
+    printf("%d\n", spliter.get_port());
 
     return 0;
 }

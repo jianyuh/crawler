@@ -18,7 +18,6 @@ void Spliter::exec()
 {
     while (state != END)
         pos = handle(pos);
-    print();
 }
 
 void Spliter::print()
@@ -30,7 +29,7 @@ void Spliter::print()
     if (has_port)
         printf("PORT : %s\n", &url[port]);
     if (has_path)
-        printf("PATH: %s\n", &url[path]);
+        printf("PATH : %s\n", &url[path]);
     return;
 }
 
@@ -122,4 +121,45 @@ int Spliter::handle(int index)
         break;
     }
     return index;
+}
+
+char* Spliter::get_proto()
+{
+    if (has_proto)
+        return &url[proto];
+    else
+        return NULL;
+}
+
+char* Spliter::get_domin()
+{
+    if (has_domin)
+        return &url[domin];
+    else
+        return NULL;
+}
+
+int Spliter::get_port()
+{
+    int ans = 0;
+
+    if (!has_port)
+        return ans;
+
+    char* p = &url[port];
+    while (*p != '\0')
+    {
+        ans *= 10;
+        ans += *p - '0';
+        p++;
+    }
+    return ans;
+}
+
+char* Spliter::get_path()
+{
+    if (has_path)
+        return &url[path];
+    else
+        return NULL;
 }
