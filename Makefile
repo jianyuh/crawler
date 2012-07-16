@@ -1,6 +1,6 @@
 all: main.o Spliter.o httplib.o
 	g++ main.o Spliter.o httplib.o -o url_fetch
-main.o: main.cpp Spliter.h
+main.o: main.cpp Spliter.h httplib.h
 	g++ -c main.cpp
 Spliter.o: Spliter.h Spliter.cpp
 	g++ -c Spliter.cpp
