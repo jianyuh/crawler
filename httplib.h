@@ -14,7 +14,7 @@ public:
     Http_handle(char* host, int port, char* path);
     ~Http_handle();
     int request();
-    void print_html();
+    void print_abstract();
 };
 
 #endif /* _HTTPLIB_H_ */

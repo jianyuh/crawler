@@ -2,38 +2,43 @@
 #include <cstring>
 #include "Spliter.h"
 #include "httplib.h"
+#include <pthread.h>
+#include <unistd.h>
 
 
-int main(int argc, char *argv[])
+void* fetch(void* arg)
 {
-    if (argc < 2) 
-    {
-        printf("Need an url!\n");
-        return 0;
-    }
+    char* url = (char*)arg;
 
-    Spliter spliter(argv[1]);
+    // TODO: url fix
+    Spliter spliter(url);
     spliter.exec();
-    spliter.print();
 
     // TODO: tolower
     if (spliter.get_proto() && strcmp(spliter.get_proto(), "http") != 0)
     {
+        spliter.print();
         printf("Sorry, I can only deal http.\n");
-        return 0;
+        return NULL;
     }
     
-    printf("%s\n", spliter.get_domin());
     Http_handle http_handle(spliter.get_domin(), spliter.get_port(), spliter.get_path());
+    spliter.print();
+    printf("\n");
     http_handle.request();
-    http_handle.print_html();
-    return 0;
+    printf("<<----------------------\n");
+    return NULL;
 }
 
-
-
-
-
-
-
+int main(int argc, char *argv[])
+{
+    for (int i = 1; i < argc; ++i)
+    {
+        // fetch((void*)argv[i]);
+        pthread_t id;
+        pthread_create(&id, NULL, fetch, (void*)argv[i]);
+    }
+    sleep(2);
+    return 0;
+}
 

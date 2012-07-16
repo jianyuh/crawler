@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <unistd.h>
 
 static char* empty = "";
 static char* format = "GET /%s HTTP/1.1\r\nAccept: html/text\r\nHost: %s:%d\r\nUser-Agent: Mozilla/5.0 (Windows NT 5.1; rv:13.0) Gecko/20100101 Firefox/13.0.1\r\nConnection: Close\r\n\r\n\0";
@@ -70,9 +71,11 @@ int Http_handle::request()
     int len = 0;
     len = send(fd, (void*)buffer, strlen(buffer), 0);
     len = recv(fd, (void*)buffer, BUFFERSIZE, 0);
+    close(fd);
 }
 
-void Http_handle::print_html()
+void Http_handle::print_abstract()
 {
+    // TODO
     printf("%s\n", buffer);
 }
