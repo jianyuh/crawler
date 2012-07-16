@@ -14,7 +14,6 @@ int main(int argc, char *argv[])
     spliter.exec();
     spliter.print();
 
-    printf("%d\n", spliter.get_port());
 
     return 0;
 }

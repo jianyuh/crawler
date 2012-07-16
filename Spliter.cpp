@@ -115,8 +115,8 @@ int Spliter::handle(int index)
             state = END;
         else
         {
-            index++;
             has_path = true;
+            state = END;
         }
         break;
     }
