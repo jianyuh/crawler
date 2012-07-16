@@ -30,6 +30,26 @@ Http_handle::Http_handle(char* host, int port, char* path)
     return;
 }
 
+void Http_handle::reset(char* host, int port, char* path)
+{
+    if (host)
+        this->host = host;
+    else
+        this->host = empty;
+
+    if (port == 0)
+        this->port = 80;
+    else
+        this->port = port;
+
+    if (path)
+        this->path = path;
+    else
+        this->path = empty;
+    html = buffer;
+    return;
+}
+
 Http_handle::~Http_handle()
 {
 }

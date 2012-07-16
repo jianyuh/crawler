@@ -17,6 +17,7 @@ private:
 public:
     Http_handle(char* host, int port, char* path);
     ~Http_handle();
+    void reset(char* host, int port, char* path);
     int request();
     void print_abstract();
     char* read();

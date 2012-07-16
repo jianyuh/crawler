@@ -17,6 +17,7 @@ private:
 public:
     Spliter(char* url);
     ~Spliter();
+    void reset(char* url);
     void exec();
     void print();
     char* get_proto();

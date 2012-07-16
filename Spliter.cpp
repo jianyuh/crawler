@@ -10,6 +10,15 @@ Spliter::Spliter(char* url)
     return;
 }
 
+void Spliter::reset(char* url)
+{
+    this->url = url;
+    proto = domin = port = path = pos = 0;
+    has_proto = has_domin = has_port = has_path = false;
+    state = PROTO;
+    return;
+}
+
 Spliter::~Spliter()
 {
 }
