@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <errno.h>
 
 static char* empty = "";
 static char* format = "GET /%s HTTP/1.1\r\nAccept: html/text\r\nHost: %s:%d\r\nUser-Agent: Mozilla/5.0 (Windows NT 5.1; rv:13.0) Gecko/20100101 Firefox/13.0.1\r\nConnection: Close\r\n\r\n\0";
@@ -54,15 +55,17 @@ Http_handle::~Http_handle()
 {
 }
 
-int Http_handle::sock_connect()
+int Http_handle::get_socket()
+{
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    return sockfd;
+}
+
+int Http_handle::socket_connect()
 {
     struct hostent *hp;
     hp = gethostbyname(host);
     if (hp == NULL)
-        return -1;
-
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd == -1)
         return -1;
     
     struct sockaddr_in addr;
@@ -72,26 +75,29 @@ int Http_handle::sock_connect()
 
     if (connect(sockfd, (struct sockaddr*)&addr, sizeof(struct sockaddr)) == -1)
         return -1;
-    return sockfd;
+    return 0;
 }
 
 int Http_handle::request()
 {
-    fd = sock_connect();
-    if (fd == -1) return -1;
     sprintf(buffer, format, path, host, port);
     
     int len = 0;
-    len = send(fd, (void*)buffer, strlen(buffer), 0);
-    len = recv(fd, (void*)buffer, BUFFERSIZE, 0);
-    this->clen = len;
-    sep();
-    close(fd);
+    len = send(sockfd, (void*)buffer, strlen(buffer), 0);
+    len = recv(sockfd, (void*)buffer, BUFFERSIZE, 0);
+    rec = clen = len;
     return 0;
+}
+
+void Http_handle::socket_close()
+{
+    close(sockfd);
+    return;
 }
 
 void Http_handle::print_abstract()
 {
+    sep();
     printf("Code : %d\n", get_code());
     printf("Content-Length: %d\n", get_clen());
 }
@@ -100,10 +106,8 @@ void Http_handle::sep()
 {
     int count = 0;
     char *p = buffer;
-    while (true)
+    while (count < rec)
     {
-        if (count > 500)
-            return;
         p++;
         count++;
         if (*p == '\n')
@@ -113,7 +117,8 @@ void Http_handle::sep()
     while (*p == '\r' || *p == '\n')
         p++;
     html = p;
-    clen -= p - buffer;
+    hlen = p - buffer;
+    clen = rec - hlen;
     return;
 }
 
@@ -130,7 +135,7 @@ int Http_handle::get_clen()
     while (true)
     {
         count++;
-        if (count > 500)
+        if (count > hlen)
             return clen;
         if (*p != 'C')
         {

@@ -7,12 +7,15 @@
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t mutex_arg = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t mutex_sock = PTHREAD_MUTEX_INITIALIZER;
 static int global_argc, global_count, total;
 static char** global_argv;
 
 void* fetch(void* arg)
 {
     char* url;
+    int flag;
+
     Spliter spliter("");
     Http_handle http_handle("", 0, "");
 
@@ -45,11 +48,36 @@ void* fetch(void* arg)
         }
     
         http_handle.reset(spliter.get_domin(), spliter.get_port(), spliter.get_path());
-        if (http_handle.request() == -1)
+        flag = http_handle.get_socket();
+        if (flag == -1)
+        {
+            pthread_mutex_lock(&mutex);
+            spliter.print();
+            printf("get_socket error\n");
+            printf("<<----------------------\n");
+            pthread_mutex_unlock(&mutex);
+            continue;
+        }
+
+        pthread_mutex_lock(&mutex_sock);
+        flag = http_handle.socket_connect();
+        pthread_mutex_unlock(&mutex_sock);
+        if (flag == -1)
         {
             pthread_mutex_lock(&mutex);
             spliter.print();
             printf("connect error\n");
+            printf("<<----------------------\n");
+            pthread_mutex_unlock(&mutex);
+            continue;
+        }
+
+        flag = http_handle.request();
+        if (flag == -1)
+        {
+            pthread_mutex_lock(&mutex);
+            spliter.print();
+            printf("io error\n");
             printf("<<----------------------\n");
             pthread_mutex_unlock(&mutex);
             continue;
