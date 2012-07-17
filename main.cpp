@@ -1,19 +1,23 @@
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include "Spliter.h"
 #include "httplib.h"
+#include "url.h"
 #include <pthread.h>
 #include <unistd.h>
 
+FILE* fp;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t mutex_arg = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t mutex_file = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t mutex_sock = PTHREAD_MUTEX_INITIALIZER;
-static int global_argc, global_count, total;
-static char** global_argv;
+static int total;
+
+#define URLMAXLEN 512
 
 void* fetch(void* arg)
 {
-    char* url;
+    char url[URLMAXLEN];
     int flag;
 
     Spliter spliter("");
@@ -21,17 +25,17 @@ void* fetch(void* arg)
 
     while (true)
     {
-        pthread_mutex_lock(&mutex_arg);
-        if (global_count > global_argc)
+        pthread_mutex_lock(&mutex_file);
+        if ((fgets(url, URLMAXLEN, fp)) == NULL)
         {
             total--;
-            pthread_mutex_unlock(&mutex_arg);
+            pthread_mutex_unlock(&mutex_file);
             return NULL;
         }
-        else
-            url = global_argv[global_count++];
-        pthread_mutex_unlock(&mutex_arg);
-        
+        pthread_mutex_unlock(&mutex_file);
+
+        rstrip(url);
+        if (strlen(url) == 0) continue;
         // TODO: url fix
         spliter.reset(url);
         spliter.exec();
@@ -95,13 +99,17 @@ void* fetch(void* arg)
 
 int main(int argc, char *argv[])
 {
-    global_argc = argc - 1;
-    global_argv = argv;
-    global_count = 1;
-
+    if (argc != 2)
+    {
+        perror("usage: url_fetch filename\n");
+        exit(1);
+    }
+    if ((fp = fopen(argv[1], "r")) == NULL)
+    {
+        perror("File open error!\n");
+        exit(1);
+    }
     total = 5;
-    if (argc-1 < total)
-        total = argc-1;
     for (int i = 0; i < total; ++i)
     {
         pthread_t id;
@@ -113,6 +121,7 @@ int main(int argc, char *argv[])
         if (total == 0)
             break;
     };
+    fclose(fp);
     return 0;
 }
 
