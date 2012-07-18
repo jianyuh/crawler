@@ -1,11 +1,12 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <pthread.h>
+#include <unistd.h>
+
 #include "Spliter.h"
 #include "httplib.h"
 #include "url.h"
-#include <pthread.h>
-#include <unistd.h>
 
 FILE* fp;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -37,6 +38,7 @@ void* fetch(void* arg)
         rstrip(url);
         if (strlen(url) == 0) continue;
         // TODO: url fix
+        
         spliter.reset(url);
         spliter.exec();
 
@@ -50,7 +52,7 @@ void* fetch(void* arg)
             pthread_mutex_unlock(&mutex);
             continue;
         }
-    
+
         http_handle.reset(spliter.get_domin(), spliter.get_port(), spliter.get_path());
         flag = http_handle.get_socket();
         if (flag == -1)

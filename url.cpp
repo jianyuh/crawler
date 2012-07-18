@@ -1,5 +1,6 @@
-#include "url.h"
 #include <cstring>
+
+#include "url.h"
 
 void rstrip(char* str)
 {

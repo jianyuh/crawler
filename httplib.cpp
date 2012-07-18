@@ -1,4 +1,3 @@
-#include "httplib.h"
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
@@ -8,8 +7,10 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include "httplib.h"
+
 static char* empty = "";
-static char* format = "GET /%s HTTP/1.1\r\nAccept: html/text\r\nHost: %s:%d\r\nUser-Agent: Mozilla/5.0 (Windows NT 5.1; rv:13.0) Gecko/20100101 Firefox/13.0.1\r\nConnection: Close\r\n\r\n\0";
+static char* format = "GET /%s HTTP/1.1\r\nAccept: html/text\r\nHost: %s:%d\r\nUser-Agent: Mozilla/5.0 (Windows NT 5.1; rv:13.0) Gecko/20100101 Firefox/13.0.1\r\nConnection: Close\r\n\r\n";
 
 Http_handle::Http_handle(char* host, int port, char* path)
 {
