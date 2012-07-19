@@ -32,6 +32,27 @@ Http_handle::Http_handle(char* host, int port, char* path)
     return;
 }
 
+Http_handle::Http_handle(char* url)
+{
+    this->url = strdup(url);
+    return;
+}
+
+Http_handle::~Http_handle()
+{
+    if (NULL != url)
+        free(url);
+    return;
+}
+
+void Http_handle::reset(char* url)
+{
+    if (NULL != this->url)
+        free(this->url);
+    this->url = strdup(url);
+    return;
+}
+
 void Http_handle::reset(char* host, int port, char* path)
 {
     if (host)
@@ -50,10 +71,6 @@ void Http_handle::reset(char* host, int port, char* path)
         this->path = empty;
     html = buffer;
     return;
-}
-
-Http_handle::~Http_handle()
-{
 }
 
 int Http_handle::get_socket()
