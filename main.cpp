@@ -4,134 +4,116 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#include "Spliter.h"
-#include "httplib.h"
-#include "url.h"
+#include "ul_log.h"
 
-FILE* fp;
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t mutex_file = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t mutex_sock = PTHREAD_MUTEX_INITIALIZER;
-static int total;
+#include "http_handle.h"
+#include "dict.h"
+#include "config.h"
 
 #define URLMAXLEN 255
+#define MAXTHREAD 100
 
 const char * USEAGE = 
 "Useage : %s -f filename [OPTION]\n"
 "OPTION:\n"
-"  -n  integer        设置线程数量\n";
+"  -n  integer    thread setting\n"
+"  -t  integer    set timeout(ms)\n"
+"  -s  integer    set maxsize\n"
+"  -d             output response content\n"
+"  -c  filename   specify configuration file\n"
 ;
 
-void* fetch(void* arg)
+FILE* fp;
+static pthread_mutex_t mutex_stdout = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t mutex_file = PTHREAD_MUTEX_INITIALIZER;
+static int timeout;
+static int maxsize;
+static bool need_content;
+static ul_logstat_t logstat = {16, 0, 0};
+static Dict *dict;
+
+void* crawler(void* arg)
 {
     char url[URLMAXLEN];
-    int flag;
+    Http_handle http_handle;
+    int code;
+    int length;
 
-    Spliter spliter("");
-    Http_handle http_handle("", 0, "");
+    if (0 != ul_openlog_r("crawler_thread", &logstat)) {
+        ul_writelog(UL_LOG_WARNING, "ul_openlog_r failed.");
+        return NULL;
+    }
 
-    while (true)
-    {
+    http_handle.set_maxsize(maxsize);
+    http_handle.set_timeout(timeout);
+
+    ul_writelog(UL_LOG_TRACE, "crawler thread created.");
+    
+    while (true) {
         pthread_mutex_lock(&mutex_file);
-        if ((fgets(url, URLMAXLEN, fp)) == NULL)
-        {
-            total--;
+        if ((fgets(url, URLMAXLEN, fp)) == NULL) {
             pthread_mutex_unlock(&mutex_file);
+            ul_writelog(UL_LOG_TRACE, "crawler thread ended.");
+            ul_closelog_r(0);
             return NULL;
         }
         pthread_mutex_unlock(&mutex_file);
 
-        rstrip(url);
-        if (strlen(url) == 0) continue;
-        // TODO: url fix
+        ul_writelog(UL_LOG_TRACE, "got url.");
+        length = strlen(url);
+        if (length <= 2) {
+            ul_writelog(UL_LOG_WARNING, "url is too short or empty.");
+            continue;
+        }
+        if ('\n' == url[length-1]) {
+            url[length-1] = '\0';
+        }
+
+        if (dict->query(url)) {
+            ul_writelog(UL_LOG_WARNING, "common url, skip :%s", url);
+            continue;
+        } else {
+            if (0 == dict->add(url)) {
+                ul_writelog(UL_LOG_TRACE, "added url to dict.");
+            } else {
+                ul_writelog(UL_LOG_WARNING, "error while add url to dict.");
+            }
+        }
         
-        spliter.reset(url);
-        spliter.exec();
-
-        // TODO: tolower
-        if (spliter.get_proto() && strcmp(spliter.get_proto(), "http") != 0)
-        {
-            pthread_mutex_lock(&mutex);
-            spliter.print();
-            printf("Sorry, I can only deal http.\n");
-            printf("<<----------------------\n");
-            pthread_mutex_unlock(&mutex);
-            continue;
+        http_handle.reset(url);
+        if (0 != (code = http_handle.doit())) {
+            switch (code)
+            {
+            case -1:
+                ul_writelog(UL_LOG_WARNING, "url format not correct.");
+                break;
+            case -2:
+                ul_writelog(UL_LOG_WARNING, "can't get host ip address.");
+                break;
+            case -3:
+                ul_writelog(UL_LOG_WARNING, "can't crawler the url.");
+                break;
+            default:
+                ul_writelog(UL_LOG_WARNING, "unknow error occured.");
+                break;
+            }
+        } else {
+            ul_writelog(UL_LOG_TRACE, "crawl success.");
+            pthread_mutex_lock(&mutex_stdout);
+            printf("URL     : %s\n", url);
+            printf("CODE    : %d\n", http_handle.get_code());
+            printf("LENTH   : %d\n", http_handle.get_len());
+            if (need_content) {
+                printf("\nCONTENT : \n%s\n\n", http_handle.get_content());
+            }
+            printf("<==============================>\n");
+            pthread_mutex_unlock(&mutex_stdout);
         }
-
-        http_handle.reset(spliter.get_domin(), spliter.get_port(), spliter.get_path());
-        flag = http_handle.get_socket();
-        if (flag == -1)
-        {
-            pthread_mutex_lock(&mutex);
-            spliter.print();
-            printf("get_socket error\n");
-            printf("<<----------------------\n");
-            pthread_mutex_unlock(&mutex);
-            continue;
-        }
-
-        pthread_mutex_lock(&mutex_sock);
-        flag = http_handle.socket_connect();
-        pthread_mutex_unlock(&mutex_sock);
-        if (flag == -1)
-        {
-            pthread_mutex_lock(&mutex);
-            spliter.print();
-            printf("connect error\n");
-            printf("<<----------------------\n");
-            pthread_mutex_unlock(&mutex);
-            continue;
-        }
-
-        flag = http_handle.request();
-        if (flag == -1)
-        {
-            pthread_mutex_lock(&mutex);
-            spliter.print();
-            printf("io error\n");
-            printf("<<----------------------\n");
-            pthread_mutex_unlock(&mutex);
-            continue;
-        }
-    
-        pthread_mutex_lock(&mutex);
-        spliter.print();
-        http_handle.print_abstract();
-        printf("<<----------------------\n");
-        pthread_mutex_unlock(&mutex);
-        continue;
     }
+    ul_writelog(UL_LOG_TRACE, "crawler thread ended.");
+    ul_closelog_r(0);
     return NULL;
 }
-
-// int main(int argc, char *argv[])
-// {
-//     if (argc != 2)
-//     {
-//         perror("usage: url_fetch filename\n");
-//         exit(1);
-//     }
-//     if ((fp = fopen(argv[1], "r")) == NULL)
-//     {
-//         perror("File open error!\n");
-//         exit(1);
-//     }
-//     total = 5;
-//     for (int i = 0; i < total; ++i)
-//     {
-//         pthread_t id;
-//         pthread_create(&id, NULL, fetch, NULL);
-//     }
-//     while (true)
-//     {
-//         sleep(1);
-//         if (total == 0)
-//             break;
-//     };
-//     fclose(fp);
-//     return 0;
-// }
 
 void show_usage(const char *proc_name)
 {
@@ -142,24 +124,98 @@ void show_usage(const char *proc_name)
 int main(int argc, char *argv[])
 {
     int opt;
-    int pthread_count = 5;
-    char* file;
+    int pthread_n = 5;
+    char* file = NULL;
+    char* config_file = NULL;
 
-    while ((opt = getopt(argc, argv, "f:n:")) != -1) {
+    timeout = 5000;
+    maxsize = 2048;
+    need_content = false;
+
+    if (0 != ul_openlog("./log", "crawler", &logstat, 1024, NULL)) {
+        printf("FATAL ERROR: open log error.\n");
+        return -1;
+    }
+
+    while ((opt = getopt(argc, argv, "c:f:n:t:s:d")) != -1) {
         switch (opt) {
+        case 'c': {
+            config_file = strdup(optarg);
+            Config config(config_file);
+
+            if (!config.isload()) {
+                ul_writelog(UL_LOG_FATAL, "configuration file open error.");
+                goto fail;
+            } else {
+                char* str;
+                int value;
+
+                if (NULL != (str = config.getstr("urls"))) {
+                    if (file) free(file);
+                    file = strdup(str);
+                }
+                if (-1 != (value = config.getint("thread"))) {
+                    pthread_n = value;
+                }
+                if (-1 != (value = config.getint("timeout"))) {
+                    timeout = value;
+                }
+                if (-1 != (value = config.getint("maxsize"))) {
+                    maxsize = value;
+                }
+            }
+            break;
+        }
         case 'n':
-            pthread_count = atoi(optarg);
+            pthread_n = atoi(optarg);
             break;
         case 'f':
+            if (!file) free(file);
             file = strdup(optarg);
+            break;
+        case 't':
+            timeout = atoi(optarg);
+            break;
+        case 's':
+            maxsize = atoi(optarg);
+            break;
+        case 'd':
+            need_content = true;
             break;
         }
     }
 
     if (NULL == file) {
         show_usage(argv[0]);
-        return -1;
+        goto fail;
     }
-    
+
+    if ((fp = fopen(file, "r")) == NULL) {
+        ul_writelog(UL_LOG_FATAL, "file open error.");
+        goto fail;
+    }
+
+    // TODO: more settings for dict
+    dict = new Dict(1024);
+
+    pthread_t tid[MAXTHREAD];
+    for (int i = 0; i < pthread_n; ++i) {
+        pthread_t id;
+        pthread_create(&id, NULL, crawler, NULL);
+        tid[i] = id;
+        ul_writelog(UL_LOG_TRACE, "created a new thread.");
+    }
+
+    for (int i = 0; i < pthread_n; ++i) {
+        pthread_join(tid[i], NULL);
+    }
+
+    ul_writelog(UL_LOG_TRACE, "completed, will exit now.");
+    fclose(fp);
+    ul_closelog(0);
     return 0;
+
+fail:
+    ul_closelog(0);
+    return -1;
 }
